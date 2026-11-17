@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Home Model for Trades</title>
+  <!-- Load Google's 3D viewer library -->
+  <script type="module" src="https://googleapis.com"></script>
+  <style>
+    body { margin: 0; background-color: #f4f4f4; }
+    model-viewer { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+
+  <!-- 3D Model Container -->
+  <model-viewer 
+    src="home.glb" 
+    alt="3D model of the home" 
+    camera-controls 
+    touch-action="pan-y"
+    shadow-intensity="1">
+  </model-viewer>
+
+</body>
+</html>

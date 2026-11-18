@@ -4,24 +4,166 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reese Residence – 3D Model</title>
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
   <style>
-    html, body { margin: 0; height: 100%; background: #e5e5e5; font-family: system-ui, sans-serif; }
-    model-viewer { width: 100vw; height: 100vh; }
-    .hint { position: fixed; bottom: 12px; left: 0; right: 0; text-align: center; color: #555; font-size: 14px; pointer-events: none; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #222; background: #e9e7e3; }
+    .app { display: flex; height: 100%; }
+    #viewer { flex: 1; position: relative; min-width: 0; }
+    #viewer canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    #status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #666; font-size: 15px; pointer-events: none; }
+    .hint { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; color: #777; font-size: 13px; pointer-events: none; }
+
+    .panel { width: 260px; flex: none; background: #fff; border-left: 1px solid #d8d5cf; padding: 18px 16px; overflow-y: auto; }
+    .panel h1 { font-size: 16px; margin: 0 0 2px; }
+    .panel .sub { font-size: 12px; color: #777; margin: 0 0 16px; }
+    .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #888; margin: 0 0 8px; font-weight: 600; }
+    .layer { display: flex; align-items: center; gap: 10px; padding: 10px 10px; border: 1px solid #e3e0da; border-radius: 8px; margin-bottom: 8px; cursor: pointer; user-select: none; }
+    .layer:hover { background: #f7f6f3; }
+    .layer input { width: 18px; height: 18px; margin: 0; accent-color: #3d6b8f; cursor: pointer; }
+    .layer .name { font-size: 14px; font-weight: 500; }
+    .layer .desc { font-size: 12px; color: #888; }
+    .layer.off .name { color: #999; }
+    .views { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 16px; }
+    .views button { font: inherit; font-size: 13px; padding: 8px 6px; border: 1px solid #d8d5cf; background: #fafaf8; border-radius: 6px; cursor: pointer; }
+    .views button:hover { background: #f0eee9; }
+    .views button.wide { grid-column: span 2; }
+
+    @media (max-width: 700px) {
+      .app { flex-direction: column; }
+      .panel { width: auto; border-left: none; border-top: 1px solid #d8d5cf; padding: 12px; max-height: 42vh; }
+      .panel .sub, .panel h1 { display: none; }
+      .layers { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .layer { margin: 0; padding: 8px; }
+      .layer .desc { display: none; }
+      .views { margin-top: 8px; grid-template-columns: repeat(3, 1fr); }
+      .views button.wide { grid-column: auto; }
+    }
   </style>
+  <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
 </head>
 <body>
-  <model-viewer
-    src="home.glb"
-    alt="3D model of the Reese Residence"
-    camera-controls
-    touch-action="pan-y"
-    auto-rotate
-    shadow-intensity="1"
-    exposure="1.1"
-    camera-orbit="45deg 60deg auto">
-  </model-viewer>
-  <div class="hint">Drag to rotate · pinch or scroll to zoom</div>
+<div class="app">
+  <div id="viewer">
+    <div id="status">Loading model…</div>
+    <div class="hint">Drag to rotate · right-drag or two fingers to pan · scroll or pinch to zoom</div>
+  </div>
+
+  <aside class="panel">
+    <h1>Reese Residence</h1>
+    <p class="sub">1437 Hollowside Way, Prescott AZ</p>
+    <h2>Layers</h2>
+    <div class="layers">
+      <label class="layer"><input type="checkbox" data-layer="LAYER_ROOF" checked>
+        <span><div class="name">Roof</div><div class="desc">Trusses, sheathing, tile</div></span></label>
+      <label class="layer"><input type="checkbox" data-layer="LAYER_MAIN" checked>
+        <span><div class="name">Main floor</div><div class="desc">Walls, doors, windows, fixtures</div></span></label>
+      <label class="layer"><input type="checkbox" data-layer="LAYER_FLOORSYS" checked>
+        <span><div class="name">Floor system</div><div class="desc">Main-floor joists &amp; subfloor</div></span></label>
+      <label class="layer"><input type="checkbox" data-layer="LAYER_LOWER" checked>
+        <span><div class="name">Lower floor</div><div class="desc">Foundation &amp; lower level</div></span></label>
+    </div>
+    <div class="views">
+      <button data-preset="all" class="wide">Whole house</button>
+      <button data-preset="main">See main floor</button>
+      <button data-preset="lower">See lower floor</button>
+    </div>
+  </aside>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+const box = document.getElementById('viewer');
+const status = document.getElementById('status');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+box.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe9e7e3);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8478, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(1, 2, 1.2);
+scene.add(sun);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+
+function resize() {
+  const w = box.clientWidth, h = box.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(box);
+resize();
+
+const layers = {};
+const draco = new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+const loader = new GLTFLoader().setDRACOLoader(draco);
+
+loader.load('home.glb', (gltf) => {
+  const model = gltf.scene;
+  scene.add(model);
+  for (const name of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER']) {
+    layers[name] = model.getObjectByName(name);
+  }
+  // frame the house
+  const bounds = new THREE.Box3().setFromObject(model);
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  const dist = Math.max(size.x, size.z) * 1.15 / Math.min(1, Math.pow(camera.aspect, 0.7));
+  camera.position.set(center.x + dist * 0.7, center.y + dist * 0.75, center.z + dist * 0.8);
+  camera.near = dist / 200; camera.far = dist * 20; camera.updateProjectionMatrix();
+  controls.target.copy(center);
+  controls.update();
+  sun.position.set(center.x + dist, center.y + dist * 2, center.z + dist * 0.6);
+  sun.target.position.copy(center); scene.add(sun.target);
+  status.remove();
+  applyCheckboxes();
+}, (e) => {
+  if (e.total) status.textContent = `Loading model… ${Math.round(e.loaded / e.total * 100)}%`;
+}, (err) => {
+  status.textContent = 'Could not load the model.';
+  console.error(err);
+});
+
+const boxes = [...document.querySelectorAll('input[data-layer]')];
+function applyCheckboxes() {
+  for (const cb of boxes) {
+    const obj = layers[cb.dataset.layer];
+    if (obj) obj.visible = cb.checked;
+    cb.closest('.layer').classList.toggle('off', !cb.checked);
+  }
+}
+boxes.forEach(cb => cb.addEventListener('change', applyCheckboxes));
+
+const presets = {
+  all:   { LAYER_ROOF: true,  LAYER_MAIN: true,  LAYER_FLOORSYS: true,  LAYER_LOWER: true },
+  main:  { LAYER_ROOF: false, LAYER_MAIN: true,  LAYER_FLOORSYS: true,  LAYER_LOWER: true },
+  lower: { LAYER_ROOF: false, LAYER_MAIN: false, LAYER_FLOORSYS: false, LAYER_LOWER: true },
+};
+document.querySelectorAll('[data-preset]').forEach(btn => btn.addEventListener('click', () => {
+  const p = presets[btn.dataset.preset];
+  boxes.forEach(cb => cb.checked = p[cb.dataset.layer]);
+  applyCheckboxes();
+}));
+
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
 </body>
 </html>

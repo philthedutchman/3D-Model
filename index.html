@@ -3,24 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Home Model for Trades</title>
-  <script type="module" src="https://googleapis.com"></script>
+  <title>Reese Residence – 3D Model</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
   <style>
-    body { margin: 0; background-color: #e5e5e5; }
+    html, body { margin: 0; height: 100%; background: #e5e5e5; font-family: system-ui, sans-serif; }
     model-viewer { width: 100vw; height: 100vh; }
+    .hint { position: fixed; bottom: 12px; left: 0; right: 0; text-align: center; color: #555; font-size: 14px; pointer-events: none; }
   </style>
 </head>
 <body>
-
-  <model-viewer 
-    src="./home.glb" 
-    alt="3D model of the home" 
-    camera-controls 
+  <model-viewer
+    src="home.glb"
+    alt="3D model of the Reese Residence"
+    camera-controls
+    touch-action="pan-y"
     auto-rotate
     shadow-intensity="1"
-    exposure="1.2"
-    environment-image="neutral">
+    exposure="1.1"
+    camera-orbit="45deg 60deg auto">
   </model-viewer>
-
+  <div class="hint">Drag to rotate · pinch or scroll to zoom</div>
 </body>
 </html>

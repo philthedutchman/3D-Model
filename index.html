@@ -30,7 +30,8 @@
 
     #pick { position: absolute; z-index: 5; background: #fff; border: 1px solid #d8d5cf; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.15); padding: 10px 12px; min-width: 170px; display: none; }
     #pick .t { font-size: 12px; color: #888; margin-bottom: 2px; }
-    #pick .n { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+    #pick .n { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+    #pick .d { font-size: 13px; color: #666; margin-bottom: 10px; min-height: 2px; }
     #pick .row { display: flex; gap: 6px; }
     #pick button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 6px; border: 1px solid #d8d5cf; background: #fafaf8; cursor: pointer; }
     #pick button.go { background: #3d6b8f; border-color: #3d6b8f; color: #fff; flex: 1; }
@@ -62,10 +63,11 @@
     <div id="pick">
       <div class="t">You clicked</div>
       <div class="n" id="pickName"></div>
+      <div class="d" id="pickDetail"></div>
       <div class="row"><button class="go" id="pickRemove">Remove</button><button id="pickCancel" aria-label="Close">✕</button></div>
     </div>
     <div id="toast"><span id="toastText"></span><button id="toastUndo">Undo</button></div>
-    <div class="hint">Tap a part of the house to remove it · drag to rotate · pinch or scroll to zoom</div>
+    <div class="hint">Tap a room to see its name, or a part of the house to remove it · drag to rotate · pinch or scroll to zoom</div>
   </div>
 
   <aside class="panel">
@@ -129,11 +131,12 @@ resize();
 
 const layers = {};
 const layerMats = {};
+const rooms = [];
 const NAMES = { LAYER_ROOF: 'Roof', LAYER_MAIN: 'Main floor', LAYER_FLOORSYS: 'Floor system', LAYER_LOWER: 'Lower floor' };
 const draco = new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader().setDRACOLoader(draco);
 
-loader.load('reese_layers.glb?v=3', (gltf) => {
+loader.load('reese_layers.glb?v=4', (gltf) => {
   const model = gltf.scene;
   scene.add(model);
   for (const name of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER']) {
@@ -148,6 +151,13 @@ loader.load('reese_layers.glb?v=3', (gltf) => {
     });
     layerMats[name] = [...cache.values()];
   }
+  model.traverse(o => {
+    if (o.isMesh && o.name.startsWith('ROOM') && o.userData.room) {
+      o.material = o.material.clone();
+      o.userData.baseColor = o.material.color.clone();
+      rooms.push(o);
+    }
+  });
   // frame the house
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
@@ -171,6 +181,7 @@ loader.load('reese_layers.glb?v=3', (gltf) => {
 
 const boxes = [...document.querySelectorAll('input[data-layer]')];
 function applyCheckboxes() {
+  if (typeof closePick === 'function' && pick.style.display === 'block') closePick();
   for (const cb of boxes) {
     const obj = layers[cb.dataset.layer];
     if (obj) obj.visible = cb.checked;
@@ -201,9 +212,23 @@ function highlight(name, on) {
     if (on) m.emissive.setRGB(0.35, 0.18, 0.0); else m.emissive.copy(m.userData.baseEmissive);
   }
 }
+let pickedRoom = null;
+function roomHighlight(r, on) {
+  if (!r) return;
+  if (on) { r.material.color.set(0xf2a33a); r.material.emissive?.set(0x6a3a00); } else { r.material.color.copy(r.userData.baseColor); r.material.emissive?.set(0x000000); }
+}
+// Which room is this point in? Look straight down from it for the nearest visible room floor.
+const down = new THREE.Raycaster();
+function roomAt(point) {
+  const visibleRooms = rooms.filter(r => { let o = r; while (o) { if (!o.visible) return false; o = o.parent; } return true; });
+  down.set(point.clone().add(new THREE.Vector3(0, 0.05, 0)), new THREE.Vector3(0, -1, 0));
+  down.far = 4.5;                                   // about one storey
+  return down.intersectObjects(visibleRooms, false)[0]?.object || null;
+}
 function closePick() {
   if (picked) highlight(picked, false);
-  picked = null; pick.style.display = 'none';
+  roomHighlight(pickedRoom, false);
+  picked = null; pickedRoom = null; pick.style.display = 'none';
 }
 renderer.domElement.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY, t: performance.now() }; });
 renderer.domElement.addEventListener('pointerup', e => {
@@ -221,8 +246,22 @@ renderer.domElement.addEventListener('pointerup', e => {
   closePick();
   if (!hit) return;
   picked = hit.object.userData.layer;
-  highlight(picked, true);
-  document.getElementById('pickName').textContent = NAMES[picked];
+  pickedRoom = picked === 'LAYER_ROOF' ? null : (hit.object.name.startsWith('ROOM') ? hit.object : roomAt(hit.point));
+  const nameEl = document.getElementById('pickName'), detailEl = document.getElementById('pickDetail');
+  if (pickedRoom) {
+    const u = pickedRoom.userData;
+    roomHighlight(pickedRoom, true);
+    nameEl.textContent = u.room;
+    const bits = [];
+    if (u.area_sf) bits.push(Math.round(u.area_sf) + ' sq ft');
+    if (u.ceiling) bits.push(u.ceiling.replace(/\s*CEILING/i, '').trim() + ' ceiling');
+    bits.push(u.level === 'LL' ? 'Lower floor' : 'Main floor');
+    detailEl.textContent = bits.join(' · ');
+  } else {
+    highlight(picked, true);
+    nameEl.textContent = NAMES[picked];
+    detailEl.textContent = '';
+  }
   document.getElementById('pickRemove').textContent = 'Remove ' + NAMES[picked].toLowerCase();
   pick.style.display = 'block';
   const bw = box.clientWidth, bh = box.clientHeight, pw = pick.offsetWidth, ph = pick.offsetHeight;

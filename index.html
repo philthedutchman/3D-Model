@@ -28,6 +28,15 @@
     .views button:hover { background: #f0eee9; }
     .views button.wide { grid-column: span 2; }
 
+    #pick { position: absolute; z-index: 5; background: #fff; border: 1px solid #d8d5cf; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.15); padding: 10px 12px; min-width: 170px; display: none; }
+    #pick .t { font-size: 12px; color: #888; margin-bottom: 2px; }
+    #pick .n { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+    #pick .row { display: flex; gap: 6px; }
+    #pick button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 6px; border: 1px solid #d8d5cf; background: #fafaf8; cursor: pointer; }
+    #pick button.go { background: #3d6b8f; border-color: #3d6b8f; color: #fff; flex: 1; }
+    #toast { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); background: #2b2b2b; color: #fff; border-radius: 8px; padding: 8px 8px 8px 14px; font-size: 14px; display: none; align-items: center; gap: 10px; z-index: 6; }
+    #toast button { font: inherit; font-size: 13px; background: none; border: 1px solid #777; color: #fff; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+
     @media (max-width: 700px) {
       .app { flex-direction: column; }
       .panel { width: auto; border-left: none; border-top: 1px solid #d8d5cf; padding: 12px; max-height: 42vh; }
@@ -50,7 +59,13 @@
 <div class="app">
   <div id="viewer">
     <div id="status">Loading model…</div>
-    <div class="hint">Drag to rotate · right-drag or two fingers to pan · scroll or pinch to zoom</div>
+    <div id="pick">
+      <div class="t">You clicked</div>
+      <div class="n" id="pickName"></div>
+      <div class="row"><button class="go" id="pickRemove">Remove</button><button id="pickCancel" aria-label="Close">✕</button></div>
+    </div>
+    <div id="toast"><span id="toastText"></span><button id="toastUndo">Undo</button></div>
+    <div class="hint">Tap a part of the house to remove it · drag to rotate · pinch or scroll to zoom</div>
   </div>
 
   <aside class="panel">
@@ -113,14 +128,25 @@ new ResizeObserver(resize).observe(box);
 resize();
 
 const layers = {};
+const layerMats = {};
+const NAMES = { LAYER_ROOF: 'Roof', LAYER_MAIN: 'Main floor', LAYER_FLOORSYS: 'Floor system', LAYER_LOWER: 'Lower floor' };
 const draco = new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader().setDRACOLoader(draco);
 
-loader.load('home.glb', (gltf) => {
+loader.load('reese_layers.glb?v=3', (gltf) => {
   const model = gltf.scene;
   scene.add(model);
   for (const name of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER']) {
     layers[name] = model.getObjectByName(name);
+    const cache = new Map();
+    layers[name]?.traverse(o => {
+      o.userData.layer = name;
+      if (o.isMesh) {
+        const swap = m => { if (!cache.has(m)) { const c = m.clone(); c.userData.baseEmissive = c.emissive ? c.emissive.clone() : null; cache.set(m, c); } return cache.get(m); };
+        o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+      }
+    });
+    layerMats[name] = [...cache.values()];
   }
   // frame the house
   const bounds = new THREE.Box3().setFromObject(model);
@@ -134,6 +160,7 @@ loader.load('home.glb', (gltf) => {
   sun.position.set(center.x + dist, center.y + dist * 2, center.z + dist * 0.6);
   sun.target.position.copy(center); scene.add(sun.target);
   status.remove();
+  if (!layers.LAYER_ROOF) console.warn('Model has no layer groups');
   applyCheckboxes();
 }, (e) => {
   if (e.total) status.textContent = `Loading model… ${Math.round(e.loaded / e.total * 100)}%`;
@@ -162,6 +189,68 @@ document.querySelectorAll('[data-preset]').forEach(btn => btn.addEventListener('
   boxes.forEach(cb => cb.checked = p[cb.dataset.layer]);
   applyCheckboxes();
 }));
+
+// ---------- click a part of the house ----------
+const pick = document.getElementById('pick');
+const ray = new THREE.Raycaster();
+let downAt = null, picked = null;
+
+function highlight(name, on) {
+  for (const m of layerMats[name] || []) {
+    if (!m.emissive) continue;
+    if (on) m.emissive.setRGB(0.35, 0.18, 0.0); else m.emissive.copy(m.userData.baseEmissive);
+  }
+}
+function closePick() {
+  if (picked) highlight(picked, false);
+  picked = null; pick.style.display = 'none';
+}
+renderer.domElement.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt) return;
+  const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+  const quick = performance.now() - downAt.t < 600;
+  downAt = null;
+  if (moved > 6 || !quick) return;              // that was a drag, not a click
+  const r = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const visibleMeshes = [];
+  scene.traverseVisible(o => { if (o.isMesh && o.userData.layer) visibleMeshes.push(o); });
+  const hit = ray.intersectObjects(visibleMeshes, false)[0];
+  closePick();
+  if (!hit) return;
+  picked = hit.object.userData.layer;
+  highlight(picked, true);
+  document.getElementById('pickName').textContent = NAMES[picked];
+  document.getElementById('pickRemove').textContent = 'Remove ' + NAMES[picked].toLowerCase();
+  pick.style.display = 'block';
+  const bw = box.clientWidth, bh = box.clientHeight, pw = pick.offsetWidth, ph = pick.offsetHeight;
+  let x = e.clientX - r.left + 12, y = e.clientY - r.top + 12;
+  if (x + pw > bw - 8) x = e.clientX - r.left - pw - 12;
+  if (y + ph > bh - 8) y = e.clientY - r.top - ph - 12;
+  pick.style.left = Math.max(8, x) + 'px'; pick.style.top = Math.max(8, y) + 'px';
+});
+document.getElementById('pickCancel').addEventListener('click', closePick);
+document.getElementById('pickRemove').addEventListener('click', () => {
+  const name = picked; closePick();
+  setLayer(name, false);
+  showToast(NAMES[name] + ' removed', () => setLayer(name, true));
+});
+controls.addEventListener('start', () => { if (picked) closePick(); });
+
+function setLayer(name, on) {
+  const cb = boxes.find(c => c.dataset.layer === name);
+  cb.checked = on; applyCheckboxes();
+}
+const toast = document.getElementById('toast');
+let toastTimer, undoFn;
+function showToast(text, undo) {
+  document.getElementById('toastText').textContent = text;
+  undoFn = undo; toast.style.display = 'flex';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.style.display = 'none', 5000);
+}
+document.getElementById('toastUndo').addEventListener('click', () => { undoFn && undoFn(); toast.style.display = 'none'; });
 
 renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
 </script>

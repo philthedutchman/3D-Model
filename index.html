@@ -215,15 +215,26 @@ function highlight(name, on) {
 let pickedRoom = null;
 function roomHighlight(r, on) {
   if (!r) return;
-  if (on) { r.material.color.set(0xf2a33a); r.material.emissive?.set(0x6a3a00); } else { r.material.color.copy(r.userData.baseColor); r.material.emissive?.set(0x000000); }
+  const m = r.material;
+  if (on) { r.userData.baseMap ??= m.map; m.map = null; m.color.set(0xf2a33a); m.emissive?.set(0x5a3000); }
+  else { m.map = r.userData.baseMap ?? m.map; m.color.copy(r.userData.baseColor); m.emissive?.set(0x000000); }
+  m.needsUpdate = true;
 }
 // Which room is this point in? Look straight down from it for the nearest visible room floor.
 const down = new THREE.Raycaster();
 function roomAt(point) {
   const visibleRooms = rooms.filter(r => { let o = r; while (o) { if (!o.visible) return false; o = o.parent; } return true; });
-  down.set(point.clone().add(new THREE.Vector3(0, 0.05, 0)), new THREE.Vector3(0, -1, 0));
   down.far = 4.5;                                   // about one storey
-  return down.intersectObjects(visibleRooms, false)[0]?.object || null;
+  // try the exact spot first, then nudge outward so clicks on walls and edges still find the room
+  for (const r of [0, 0.25, 0.5]) {
+    const offsets = r === 0 ? [[0, 0]] : [[r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, r], [r, -r], [-r, -r]];
+    for (const [dx, dz] of offsets) {
+      down.set(point.clone().add(new THREE.Vector3(dx, 0.05, dz)), new THREE.Vector3(0, -1, 0));
+      const hit = down.intersectObjects(visibleRooms, false)[0];
+      if (hit) return hit.object;
+    }
+  }
+  return null;
 }
 function closePick() {
   if (picked) highlight(picked, false);

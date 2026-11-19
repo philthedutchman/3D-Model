@@ -763,17 +763,23 @@ def build_floor():
         if r['deck'] == 'slab_on_fill':
             build_patio_on_fill(r)
             continue
-        d = MB(); d.prism(poly, -0.33, -0.02)
+        # A-301 sections 1 & 2 + S5.01 1-D: concrete top flush with the floor sheathing, 4in colored concrete pitched
+        # away over moisture barrier over 3/4in P.T. plywood, on 4x12 P.T. joists in hangers off the rim / 4x ledger
+        d = MB(); d.prism(poly, -0.333, -0.02)
         d.make('Deck/Porch Surface - %s' % r['name'], '05 Decks & Porches/Surfaces', MAT['deck'],
-               {'trade': 'Decks', 'room': r['name'], 'type': '4in colored concrete topping over P.T. plywood (pitched away)' if r['deck'] == 'elevated' else 'Concrete patio slab'})
+               {'trade': 'Decks', 'room': r['name'], 'type': '4in colored concrete topping over moisture barrier over P.T. plywood (pitched away) - A-301 sec. 1/2, S5.01 1-D' if r['deck'] == 'elevated' else 'Concrete patio slab'})
         if r['deck'] == 'elevated':
+            pw = MB(); pw.prism(poly, -0.333 - 0.0625, -0.333)
+            pw.make('Deck P.T. Plywood 3/4in + Moisture Barrier - %s' % r['name'], '05 Decks & Porches/Deck Framing', MAT['pt'],
+                    {'trade': 'Decks', 'room': r['name'], 'type': '3/4in P.T. plywood per EOR under a moisture barrier (A-301)'})
             xs = [p[0] for p in poly]; ys = [p[1] for p in poly]
+            JT, JD, JW = -0.396, 11.25 / 12, 3.5 / 12
             j = MB(); x = min(xs) + 0.2
             while x < max(xs) - 0.1:
-                j.box(x - 0.0625, min(ys) + 0.1, -0.33 - 0.96, x + 0.0625, max(ys) - 0.1, -0.33)
+                j.box(x - JW / 2, min(ys) + 0.1, JT - JD, x + JW / 2, max(ys) - 0.1, JT)
                 x += 16 / 12
-            j.make('Deck Joists 4x12 / 2x12 @16in - %s' % r['name'], '05 Decks & Porches/Deck Framing', MAT['pt'],
-                   {'trade': 'Decks', 'room': r['name'], 'type': 'P.T. joists per EOR, ledger + hangers (S5.01)'})
+            j.make('Deck Joists 4x12 P.T. @16in - %s' % r['name'], '05 Decks & Porches/Deck Framing', MAT['pt'],
+                   {'trade': 'Decks', 'room': r['name'], 'type': '4x12 P.T. joists per EOR in Simpson hangers off the rim (S5.01 1-D) / 4x ledger (A-301)'})
 
 
 def build_patio_on_fill(r):

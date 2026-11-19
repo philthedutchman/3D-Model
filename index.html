@@ -83,6 +83,8 @@
         <span><div class="name">Floor system</div><div class="desc">Main-floor joists &amp; subfloor</div></span></label>
       <label class="layer"><input type="checkbox" data-layer="LAYER_LOWER" checked>
         <span><div class="name">Lower floor</div><div class="desc">Foundation &amp; lower level</div></span></label>
+      <label class="layer"><input type="checkbox" data-layer="LAYER_SITE" checked>
+        <span><div class="name">Ground</div><div class="desc">Finish grade, retaining walls, driveway</div></span></label>
     </div>
     <div class="views">
       <button data-preset="all" class="wide">Whole house</button>
@@ -132,14 +134,14 @@ resize();
 const layers = {};
 const layerMats = {};
 const rooms = [];
-const NAMES = { LAYER_ROOF: 'Roof', LAYER_MAIN: 'Main floor', LAYER_FLOORSYS: 'Floor system', LAYER_LOWER: 'Lower floor' };
+const NAMES = { LAYER_ROOF: 'Roof', LAYER_MAIN: 'Main floor', LAYER_FLOORSYS: 'Floor system', LAYER_LOWER: 'Lower floor', LAYER_SITE: 'Ground' };
 const draco = new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader().setDRACOLoader(draco);
 
-loader.load('reese_layers.glb?v=12', (gltf) => {
+loader.load('reese_layers.glb?v=13', (gltf) => {
   const model = gltf.scene;
   scene.add(model);
-  for (const name of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER']) {
+  for (const name of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER', 'LAYER_SITE']) {
     layers[name] = model.getObjectByName(name);
     const cache = new Map();
     layers[name]?.traverse(o => {
@@ -159,7 +161,9 @@ loader.load('reese_layers.glb?v=12', (gltf) => {
     }
   });
   // frame the house
-  const bounds = new THREE.Box3().setFromObject(model);
+  const bounds = new THREE.Box3();
+  for (const n of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER']) { const o = model.getObjectByName(n); if (o) bounds.expandByObject(o); }
+  if (bounds.isEmpty()) bounds.setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
   const center = bounds.getCenter(new THREE.Vector3());
   const dist = Math.max(size.x, size.z) * 1.15 / Math.min(1, Math.pow(camera.aspect, 0.7));
@@ -191,9 +195,9 @@ function applyCheckboxes() {
 boxes.forEach(cb => cb.addEventListener('change', applyCheckboxes));
 
 const presets = {
-  all:   { LAYER_ROOF: true,  LAYER_MAIN: true,  LAYER_FLOORSYS: true,  LAYER_LOWER: true },
-  main:  { LAYER_ROOF: false, LAYER_MAIN: true,  LAYER_FLOORSYS: true,  LAYER_LOWER: true },
-  lower: { LAYER_ROOF: false, LAYER_MAIN: false, LAYER_FLOORSYS: false, LAYER_LOWER: true },
+  all:   { LAYER_ROOF: true,  LAYER_MAIN: true,  LAYER_FLOORSYS: true,  LAYER_LOWER: true, LAYER_SITE: true },
+  main:  { LAYER_ROOF: false, LAYER_MAIN: true,  LAYER_FLOORSYS: true,  LAYER_LOWER: true, LAYER_SITE: false },
+  lower: { LAYER_ROOF: false, LAYER_MAIN: false, LAYER_FLOORSYS: false, LAYER_LOWER: true, LAYER_SITE: false },
 };
 document.querySelectorAll('[data-preset]').forEach(btn => btn.addEventListener('click', () => {
   const p = presets[btn.dataset.preset];

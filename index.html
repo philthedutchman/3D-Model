@@ -155,6 +155,7 @@ loader.load('reese_layers.glb?v=16', (gltf) => {
     if (o.isMesh && o.name.startsWith('ROOM') && o.userData.room) {
       o.material = o.material.clone();
       o.userData.baseColor = o.material.color.clone();
+      if (o.userData.exterior) o.material.visible = false;   // porch/patio zones: still tappable, not drawn (owner 11/18)
       rooms.push(o);
     }
   });
@@ -218,8 +219,8 @@ let pickedRoom = null;
 function roomHighlight(r, on) {
   if (!r) return;
   const m = r.material;
-  if (on) { r.userData.baseMap ??= m.map; m.map = null; m.color.set(0xf2a33a); m.emissive?.set(0x5a3000); }
-  else { m.map = r.userData.baseMap ?? m.map; m.color.copy(r.userData.baseColor); m.emissive?.set(0x000000); }
+  if (on) { r.userData.baseMap ??= m.map; m.map = null; m.color.set(0xf2a33a); m.emissive?.set(0x5a3000); m.visible = true; }
+  else { m.map = r.userData.baseMap ?? m.map; m.color.copy(r.userData.baseColor); m.emissive?.set(0x000000); if (r.userData.exterior) m.visible = false; }
   m.needsUpdate = true;
 }
 // Which room is this point in? Look straight down from it for the nearest visible room floor.

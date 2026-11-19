@@ -835,19 +835,7 @@ def build_floor():
                 rb.obox((x1_ + nx_ * o_, y1_ + ny_ * o_, JT - JD), (x2_ + nx_ * o_, y2_ + ny_ * o_, JT - JD), 1.25 / 12, JD + 0.0625)
             rb.make('Deck Rim Board 1-1/4in - %s' % r['name'], '05 Decks & Porches/Deck Framing', MAT['tji'],
                     {'trade': 'Decks', 'room': r['name'], 'type': '1-1/4in rim board around the deck; joists nailed / hung to it'})
-            # 1-1/2in T&G ceiling under the deck joists (A-301 section 1: "1 1/2in T&G CEILING") - owner 11/18
-            BW, BT, GAP = 5.125 / 12, 1.5 / 12, 0.375 / 12
-            zt = JT - JD; tg = MB()
-            if ew:                                         # boards run across the joists
-                x = min(xs)
-                while x < max(xs) - 0.01:
-                    tg.box(x, min(ys), zt - BT, min(x + BW, max(xs)), max(ys), zt); x += BW + GAP
-            else:
-                y = min(ys)
-                while y < max(ys) - 0.01:
-                    tg.box(min(xs), y, zt - BT, max(xs), min(y + BW, max(ys)), zt); y += BW + GAP
-            tg.make('Under-Deck T&G Ceiling 2x6 - %s' % r['name'], '05 Decks & Porches/Under-Deck T&G Ceiling', MAT['tg'],
-                    {'trade': 'Decks', 'room': r['name'], 'type': '2x6 T&G (1-1/2in) on the underside of the deck joists (A-301 sec. 1)'})
+            # deck joists stay exposed underneath - no T&G under the decks (owner 11/18)
             j.make('Deck Joists 9-1/2in TJI 210 @%din - %s' % (round(oc * 12), r['name']), '05 Decks & Porches/Deck Framing', MAT['tji'],
                    {'trade': 'Decks', 'room': r['name'], 'type': '9-1/2in TJI 210 per S1.01 (F3-2 / F3-3), IUS2.06/9.5 hangers off the rim (S5.01 1-D)'})
 

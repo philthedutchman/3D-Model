@@ -136,7 +136,7 @@ const NAMES = { LAYER_ROOF: 'Roof', LAYER_MAIN: 'Main floor', LAYER_FLOORSYS: 'F
 const draco = new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader().setDRACOLoader(draco);
 
-loader.load('reese_layers.glb?v=44', (gltf) => {
+loader.load('reese_layers.glb?v=45', (gltf) => {
   const model = gltf.scene;
   scene.add(model);
   for (const name of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER', 'LAYER_SITE']) {

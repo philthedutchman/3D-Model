@@ -83,6 +83,8 @@
         <span><div class="name">Floor system</div><div class="desc">Main-floor joists &amp; subfloor</div></span></label>
       <label class="layer"><input type="checkbox" data-layer="LAYER_LOWER" checked>
         <span><div class="name">Lower floor</div><div class="desc">Foundation &amp; lower level</div></span></label>
+      <label class="layer"><input type="checkbox" data-layer="LAYER_SITE" checked>
+        <span><div class="name">Backfill &amp; grade</div><div class="desc">Earth around the house, retaining walls</div></span></label>
     </div>
     <div class="views">
       <button data-preset="all" class="wide">Whole house</button>
@@ -132,11 +134,11 @@ resize();
 const layers = {};
 const layerMats = {};
 const rooms = [];
-const NAMES = { LAYER_ROOF: 'Roof', LAYER_MAIN: 'Main floor', LAYER_FLOORSYS: 'Floor system', LAYER_LOWER: 'Lower floor', LAYER_SITE: 'Ground' };
+const NAMES = { LAYER_ROOF: 'Roof', LAYER_MAIN: 'Main floor', LAYER_FLOORSYS: 'Floor system', LAYER_LOWER: 'Lower floor', LAYER_SITE: 'Backfill & grade' };
 const draco = new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader().setDRACOLoader(draco);
 
-loader.load('reese_layers.glb?v=46', (gltf) => {
+loader.load('reese_layers.glb?v=47', (gltf) => {
   const model = gltf.scene;
   scene.add(model);
   for (const name of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER', 'LAYER_SITE']) {

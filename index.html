@@ -84,7 +84,7 @@
       <label class="layer"><input type="checkbox" data-layer="LAYER_LOWER" checked>
         <span><div class="name">Lower floor</div><div class="desc">Foundation &amp; lower level</div></span></label>
       <label class="layer"><input type="checkbox" data-layer="LAYER_SITE" checked>
-        <span><div class="name">Backfill &amp; grade</div><div class="desc">Earth around the house, retaining walls</div></span></label>
+        <span><div class="name">Backfill &amp; grade</div><div class="desc">Earth, driveway, retaining walls</div></span></label>
     </div>
     <div class="views">
       <button data-preset="all" class="wide">Whole house</button>
@@ -138,7 +138,7 @@ const NAMES = { LAYER_ROOF: 'Roof', LAYER_MAIN: 'Main floor', LAYER_FLOORSYS: 'F
 const draco = new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader().setDRACOLoader(draco);
 
-loader.load('reese_layers.glb?v=48', (gltf) => {
+loader.load('reese_layers.glb?v=49', (gltf) => {
   const model = gltf.scene;
   scene.add(model);
   for (const name of ['LAYER_ROOF', 'LAYER_MAIN', 'LAYER_FLOORSYS', 'LAYER_LOWER', 'LAYER_SITE']) {
